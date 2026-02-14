@@ -14,12 +14,12 @@ from .redis_client import get_redis, QUEUE_KEY
 
 BATCH_SIZE = int(os.getenv("QUEUE_BATCH_SIZE", "200"))
 DLQ_KEY = "queue:failed"  # dead letter queue for failed items
-MAX_RETRIES = int(os.getenv("MAX_RETRIES", "3"))  # max retry attempts
-RETRY_DELAY_MINUTES = int(os.getenv("RETRY_DELAY_MINUTES", "5"))  # minutes before retry
+MAX_RETRIES = int(os.getenv("MAX_RETRIES", "3"))
+RETRY_DELAY_MINUTES = int(os.getenv("RETRY_DELAY_MINUTES", "5"))
 
 
 async def fetch_batch_from_redis(limit: int) -> list[dict]:
-    """Fetch up to 'limit' items from Redis queue using pipeline for performance"""
+
     redis = await get_redis()
     batch = []
     
@@ -37,11 +37,9 @@ async def fetch_batch_from_redis(limit: int) -> list[dict]:
 
 
 async def process_one_token(token_data: dict) -> dict | None:
-    """
-    Process a single token. Returns processed data on success, None on failure.
-    Simulates heavy processing work (4-10 seconds randomly).
-    """
+    
     start = monotonic()
+    
     try:
         # Simulate heavy processing work (random between 4 and 10 seconds)
         processing_time = random.uniform(4, 10)
@@ -62,7 +60,7 @@ async def process_one_token(token_data: dict) -> dict | None:
 
 
 async def send_to_dlq(token_data: dict, error: str) -> None:
-    """Send failed token to DLQ or discard if max retries exceeded"""
+
     redis = await get_redis()
     
     retry_count = token_data.get("retry_count", 0)
@@ -88,10 +86,6 @@ async def send_to_dlq(token_data: dict, error: str) -> None:
 
 
 async def process_batch(batch: list[dict]) -> tuple[list[dict], list[dict]]:
-    """
-    Process all tokens in parallel. Returns (successes, failures).
-    Individual failures don't break the entire batch.
-    """
 
     results = await asyncio.gather(
         *[process_one_token(token) for token in batch],
@@ -119,7 +113,7 @@ async def process_batch(batch: list[dict]) -> tuple[list[dict], list[dict]]:
 
 
 async def save_processed(session: AsyncSession, batch: list[dict]) -> None:
-    """Save all successfully processed tokens to Postgres in one transaction"""
+
     if not batch:
         return
     
@@ -137,11 +131,7 @@ async def save_processed(session: AsyncSession, batch: list[dict]) -> None:
 
 
 async def process_one_cycle(session_factory) -> int:
-    """
-    One processing cycle: fetch batch from Redis, process in parallel, save successes to Postgres.
-    Failed items are sent to DLQ for later inspection/retry.
-    """
-    # Fetch batch from Redis (fast - in memory)
+    
     batch = await fetch_batch_from_redis(BATCH_SIZE)
     
     if not batch:
@@ -158,9 +148,7 @@ async def process_one_cycle(session_factory) -> int:
     # Update metrics immediately after processing (before DB save)
     if success_count > 0:
         QUEUE_PROCESSED_TOTAL.inc(success_count)
-        # Note: QUEUE_PROCESSING_SECONDS is already recorded per token in process_one_token()
     
-    # Save only successful items to Postgres (separate from processing metrics)
     save_start = monotonic()
     async with session_factory() as session:
         await save_processed(session, successes)
@@ -210,8 +198,6 @@ async def dlq_retry_worker() -> None:
 
 
 async def worker_loop(worker_id: int, session_factory) -> None:
-    """Main worker loop - continuously processes batches until stopped"""
-    print(f"[worker-{worker_id}] started")
     while True:
         try:
             count = await process_one_cycle(session_factory)
@@ -224,7 +210,7 @@ async def worker_loop(worker_id: int, session_factory) -> None:
 
 
 async def start_workers(concurrency: int, session_factory) -> None:
-    """Start worker pool with specified concurrency + DLQ retry worker"""
+
     print(f"[workers] starting {concurrency} workers (BATCH_SIZE={BATCH_SIZE})")
     
     # Start main processing workers

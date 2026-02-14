@@ -6,7 +6,6 @@ from .db import Base
 
 
 class QueueProcessed(Base):
-    """Tabela de processados - só INSERT (fila agora é no Redis)"""
     __tablename__ = "queue_processed"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
