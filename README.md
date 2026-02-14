@@ -67,5 +67,8 @@ RETRY_DELAY_MINUTES=5      # Token retry delay
 
 **Performance**: 10k+ tokens/s with 50 vertical workers, 3 horizontal workers and 100 batch size
 
+![performance overview](others/performance_overview.png)
+
 ## Dead Letter Queue
 Failed tokens go to DLQ with automatic retry after 5 minutes (max 3 retries). 
+
